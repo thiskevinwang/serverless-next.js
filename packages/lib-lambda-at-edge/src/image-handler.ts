@@ -1,36 +1,35 @@
+import { AwsPlatformClient } from "@sls-next/aws-common";
+import {
+  handleAuth,
+  handleDomainRedirects,
+  setCustomHeaders,
+} from "@sls-next/core";
+import { imageOptimizer, normaliseUri } from "@sls-next/core/src/images";
+import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
+
+import { CloudFrontResultResponse } from "aws-lambda";
+import { UrlWithParsedQuery } from "url";
+import url from "url";
+
+import { removeBlacklistedHeaders } from "./headers/removeBlacklistedHeaders";
 // @ts-ignore
 import manifest from "./manifest.json";
 // @ts-ignore
 import RoutesManifestJson from "./routes-manifest.json";
+import { s3BucketNameFromEventRequest } from "./s3/s3BucketNameFromEventRequest";
 import {
   ImagesManifest,
   OriginRequestEvent,
   OriginRequestImageHandlerManifest,
-  RoutesManifest
+  RoutesManifest,
 } from "./types";
-import { CloudFrontResultResponse } from "aws-lambda";
-import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
-import {
-  handleAuth,
-  handleDomainRedirects,
-  setCustomHeaders
-} from "@sls-next/core/dist/module";
-import {
-  imageOptimizer,
-  normaliseUri
-} from "@sls-next/core/dist/module/images";
-import { UrlWithParsedQuery } from "url";
-import url from "url";
-import { removeBlacklistedHeaders } from "./headers/removeBlacklistedHeaders";
-import { s3BucketNameFromEventRequest } from "./s3/s3BucketNameFromEventRequest";
-import { AwsPlatformClient } from "@sls-next/aws-common";
 
 const basePath = RoutesManifestJson.basePath;
 const isImageOptimizerRequest = (uri: string): boolean =>
   uri.startsWith("/_next/image");
 
 export const handler = async (
-  event: OriginRequestEvent
+  event: OriginRequestEvent,
 ): Promise<CloudFrontResultResponse> => {
   const request = event.Records[0].cf.request;
   const routesManifest: RoutesManifest = RoutesManifestJson;
@@ -65,20 +64,20 @@ export const handler = async (
       imagesManifest = await import("./images-manifest.json");
     } catch (error) {
       console.warn(
-        "Images manifest not found for image optimizer request. Image optimizer will fallback to defaults."
+        "Images manifest not found for image optimizer request. Image optimizer will fallback to defaults.",
       );
     }
 
     const { req, res, responsePromise } = lambdaAtEdgeCompat(
       event.Records[0].cf,
       {
-        enableHTTPCompression: manifest.enableHTTPCompression
-      }
+        enableHTTPCompression: manifest.enableHTTPCompression,
+      },
     );
 
     const urlWithParsedQuery: UrlWithParsedQuery = url.parse(
       `${request.uri}?${request.querystring}`,
-      true
+      true,
     );
 
     const { region: bucketRegion } = request.origin!.s3!;
@@ -88,7 +87,7 @@ export const handler = async (
       bucketName,
       bucketRegion,
       undefined,
-      undefined
+      undefined,
     );
 
     await imageOptimizer(
@@ -97,7 +96,7 @@ export const handler = async (
       req,
       res,
       urlWithParsedQuery,
-      awsPlatformClient
+      awsPlatformClient,
     );
 
     setCustomHeaders({ res, req, responsePromise }, routesManifest);
@@ -111,7 +110,7 @@ export const handler = async (
     return response;
   } else {
     return {
-      status: "404"
+      status: "404",
     };
   }
 };

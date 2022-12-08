@@ -1,33 +1,35 @@
+import { handleApi } from "@sls-next/core/src/handle/api";
+import cloudFrontCompat from "@sls-next/next-aws-cloudfront";
+
+import { CloudFrontResultResponse } from "aws-lambda";
+
+import { removeBlacklistedHeaders } from "./headers/removeBlacklistedHeaders";
 // @ts-ignore
 import manifest from "./manifest.json";
 // @ts-ignore
 import RoutesManifestJson from "./routes-manifest.json";
-import cloudFrontCompat from "@sls-next/next-aws-cloudfront";
+import { createExternalRewriteResponse } from "./routing/rewriter";
 import {
   OriginRequestApiHandlerManifest,
   OriginRequestEvent,
-  RoutesManifest
+  RoutesManifest,
 } from "./types";
-import { CloudFrontResultResponse } from "aws-lambda";
-import { createExternalRewriteResponse } from "./routing/rewriter";
-import { handleApi } from "@sls-next/core/dist/module/handle/api";
-import { removeBlacklistedHeaders } from "./headers/removeBlacklistedHeaders";
 
 export const handler = async (
-  event: OriginRequestEvent
+  event: OriginRequestEvent,
 ): Promise<CloudFrontResultResponse> => {
   const request = event.Records[0].cf.request;
   const routesManifest: RoutesManifest = RoutesManifestJson;
   const buildManifest: OriginRequestApiHandlerManifest = manifest;
   const { req, res, responsePromise } = cloudFrontCompat(event.Records[0].cf, {
-    enableHTTPCompression: buildManifest.enableHTTPCompression
+    enableHTTPCompression: buildManifest.enableHTTPCompression,
   });
 
   const external = await handleApi(
     { req, res, responsePromise },
     buildManifest,
     routesManifest,
-    (pagePath: string) => require(`./${pagePath}`)
+    (pagePath: string) => require(`./${pagePath}`),
   );
 
   if (external) {

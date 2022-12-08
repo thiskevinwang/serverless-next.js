@@ -1,59 +1,57 @@
-// @ts-ignore
-import PrerenderManifest from "./prerender-manifest.json";
-// @ts-ignore
-import Manifest from "./manifest.json";
-// @ts-ignore
-import RoutesManifestJson from "./routes-manifest.json";
-// @ts-ignore
-import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
-import { renderStaticPage } from "./render/renderStaticPage";
 import {
   getCustomHeaders,
   handleDefault,
-  handleFallback
-} from "@sls-next/core/dist/module/handle";
-import {
-  handlePublicFiles,
-  routeDefault
-} from "@sls-next/core/dist/module/route";
+  handleFallback,
+} from "@sls-next/core/src/handle";
+import { redirectByPageProps } from "@sls-next/core/src/handle/redirect";
 import {
   getStaticRegenerationResponse,
-  getThrottledStaticRegenerationCachePolicy
-} from "@sls-next/core/dist/module/revalidate";
+  getThrottledStaticRegenerationCachePolicy,
+} from "@sls-next/core/src/revalidate";
+import { handlePublicFiles, routeDefault } from "@sls-next/core/src/route";
+import { createRedirectResponse } from "@sls-next/core/src/route/redirect";
 import {
   ExternalRoute,
+  NextStaticFileRoute,
   PublicFileRoute,
   Route,
   StaticRoute,
-  NextStaticFileRoute
-} from "@sls-next/core/dist/module/types";
+} from "@sls-next/core/src/types";
+import {
+  PerfLogger,
+  PreRenderedManifest as PrerenderManifestType,
+} from "@sls-next/core/src/types";
+import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
 
+import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import {
   CloudFrontRequest,
   CloudFrontResultResponse,
-  CloudFrontS3Origin
+  CloudFrontS3Origin,
 } from "aws-lambda";
+import getStream from "get-stream";
+import { performance } from "perf_hooks";
+import type { Readable } from "stream";
+
+import { removeBlacklistedHeaders } from "./headers/removeBlacklistedHeaders";
+import { triggerStaticRegeneration } from "./lib/triggerStaticRegeneration";
+// @ts-ignore
+import Manifest from "./manifest.json";
+// @ts-ignore
+import PrerenderManifest from "./prerender-manifest.json";
+// @ts-ignore
+import { renderStaticPage } from "./render/renderStaticPage";
+// @ts-ignore
+import RoutesManifestJson from "./routes-manifest.json";
+import { externalRewrite } from "./routing/rewriter";
+import { s3BucketNameFromEventRequest } from "./s3/s3BucketNameFromEventRequest";
+import { s3StorePage } from "./s3/s3StorePage";
 import {
   OriginRequestDefaultHandlerManifest,
   OriginRequestEvent,
   OriginResponseEvent,
-  RoutesManifest
+  RoutesManifest,
 } from "./types";
-import {
-  PreRenderedManifest as PrerenderManifestType,
-  PerfLogger
-} from "@sls-next/core/dist/module/types";
-import { performance } from "perf_hooks";
-import type { Readable } from "stream";
-import { externalRewrite } from "./routing/rewriter";
-import { removeBlacklistedHeaders } from "./headers/removeBlacklistedHeaders";
-import { s3BucketNameFromEventRequest } from "./s3/s3BucketNameFromEventRequest";
-import { triggerStaticRegeneration } from "./lib/triggerStaticRegeneration";
-import { s3StorePage } from "./s3/s3StorePage";
-import { createRedirectResponse } from "@sls-next/core/dist/module/route/redirect";
-import { redirectByPageProps } from "@sls-next/core/dist/module/handle/redirect";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
-import getStream from "get-stream";
 
 const basePath = RoutesManifestJson.basePath;
 
@@ -64,19 +62,19 @@ const perfLogger = (logLambdaExecutionTimes?: boolean): PerfLogger => {
       log: (metricDescription: string, t1?: number, t2?: number): void => {
         if (!t1 || !t2) return;
         console.log(`${metricDescription}: ${t2 - t1} (ms)`);
-      }
+      },
     };
   }
   return {
     now: () => 0,
     // eslint-disable-next-line @typescript-eslint/no-empty-function
-    log: () => {}
+    log: () => {},
   };
 };
 
 const addS3HostHeader = (
   req: CloudFrontRequest,
-  s3DomainName: string
+  s3DomainName: string,
 ): void => {
   req.headers["host"] = [{ key: "host", value: s3DomainName }];
 };
@@ -89,7 +87,7 @@ const normaliseS3OriginDomain = (s3Origin: CloudFrontS3Origin): string => {
   if (!s3Origin.domainName.includes(s3Origin.region)) {
     const regionalEndpoint = s3Origin.domainName.replace(
       "s3.amazonaws.com",
-      `s3.${s3Origin.region}.amazonaws.com`
+      `s3.${s3Origin.region}.amazonaws.com`,
     );
     return regionalEndpoint;
   }
@@ -98,7 +96,7 @@ const normaliseS3OriginDomain = (s3Origin: CloudFrontS3Origin): string => {
 };
 
 export const handler = async (
-  event: OriginRequestEvent | OriginResponseEvent
+  event: OriginRequestEvent | OriginResponseEvent,
 ): Promise<CloudFrontResultResponse | CloudFrontRequest> => {
   const manifest: OriginRequestDefaultHandlerManifest = Manifest;
   let response: CloudFrontResultResponse | CloudFrontRequest;
@@ -114,14 +112,14 @@ export const handler = async (
       event,
       manifest,
       prerenderManifest,
-      routesManifest
+      routesManifest,
     });
   } else {
     response = await handleOriginRequest({
       event,
       manifest,
       prerenderManifest,
-      routesManifest
+      routesManifest,
     });
   }
 
@@ -143,15 +141,15 @@ const staticRequest = async (
   path: string,
   route: Route,
   manifest: OriginRequestDefaultHandlerManifest,
-  routesManifest: RoutesManifest
+  routesManifest: RoutesManifest,
 ) => {
   const request = event.Records[0].cf.request;
   if (manifest.disableOriginResponseHandler) {
     const { req, res, responsePromise } = lambdaAtEdgeCompat(
       event.Records[0].cf,
       {
-        enableHTTPCompression: manifest.enableHTTPCompression
-      }
+        enableHTTPCompression: manifest.enableHTTPCompression,
+      },
     );
 
     const bucketName = s3BucketNameFromEventRequest(request) ?? "";
@@ -168,7 +166,7 @@ const staticRequest = async (
       bucketName: bucketName,
       s3Key: s3Key,
       s3Uri: file,
-      basePath: basePath
+      basePath: basePath,
     });
   } else {
     const s3Origin = request.origin?.s3 as CloudFrontS3Origin;
@@ -183,7 +181,7 @@ const staticRequest = async (
 
 const reconstructOriginalRequestUri = (
   s3Uri: string,
-  manifest: OriginRequestDefaultHandlerManifest
+  manifest: OriginRequestDefaultHandlerManifest,
 ) => {
   // For public files we do not replace .html as it can cause public HTML files to be classified with wrong status code
   const publicFile = handlePublicFiles(s3Uri, manifest);
@@ -193,13 +191,13 @@ const reconstructOriginalRequestUri = (
 
   let originalUri = `${basePath}${s3Uri.replace(
     /(\.html)?$/,
-    manifest.trailingSlash ? "/" : ""
+    manifest.trailingSlash ? "/" : "",
   )}`;
 
   // For index.html page, it will become "/index" or "/index/", which is not a route so normalize it to "/"
   originalUri = originalUri.replace(
     manifest.trailingSlash ? /\/index\/$/ : /\/index$/,
-    "/"
+    "/",
   );
 
   return originalUri;
@@ -209,7 +207,7 @@ const handleOriginRequest = async ({
   event,
   manifest,
   prerenderManifest,
-  routesManifest
+  routesManifest,
 }: {
   event: OriginRequestEvent;
   manifest: OriginRequestDefaultHandlerManifest;
@@ -220,8 +218,8 @@ const handleOriginRequest = async ({
   const { req, res, responsePromise } = lambdaAtEdgeCompat(
     event.Records[0].cf,
     {
-      enableHTTPCompression: manifest.enableHTTPCompression
-    }
+      enableHTTPCompression: manifest.enableHTTPCompression,
+    },
   );
 
   const { now, log } = perfLogger(manifest.logLambdaExecutionTimes);
@@ -240,7 +238,7 @@ const handleOriginRequest = async ({
     manifest,
     prerenderManifest,
     routesManifest,
-    getPage
+    getPage,
   );
   if (tBeforeSSR) {
     const tAfterSSR = now();
@@ -259,7 +257,7 @@ const handleOriginRequest = async ({
       `${routesManifest.basePath}/public`,
       route,
       manifest,
-      routesManifest
+      routesManifest,
     );
   }
   if (route.isNextStaticFile) {
@@ -270,7 +268,7 @@ const handleOriginRequest = async ({
       `${routesManifest.basePath}/_next/static`,
       route,
       manifest,
-      routesManifest
+      routesManifest,
     );
   }
   if (route.isStatic) {
@@ -286,7 +284,7 @@ const handleOriginRequest = async ({
       path,
       route,
       manifest,
-      routesManifest
+      routesManifest,
     );
   }
 
@@ -299,7 +297,7 @@ const handleOriginResponse = async ({
   event,
   manifest,
   prerenderManifest,
-  routesManifest
+  routesManifest,
 }: {
   event: OriginResponseEvent;
   manifest: OriginRequestDefaultHandlerManifest;
@@ -319,7 +317,7 @@ const handleOriginResponse = async ({
     request,
     manifest,
     prerenderManifest,
-    routesManifest
+    routesManifest,
   );
   const staticRoute = route.isStatic ? (route as StaticRoute) : undefined;
   const statusCode = route?.statusCode;
@@ -329,7 +327,7 @@ const handleOriginResponse = async ({
   if (response.status !== "403" && response.status !== "404") {
     response.headers = {
       ...response.headers,
-      ...getCustomHeaders(request.uri, routesManifest)
+      ...getCustomHeaders(request.uri, routesManifest),
     };
     // Set 404 status code for static 404 page.
     if (statusCode === 404) {
@@ -345,8 +343,8 @@ const handleOriginResponse = async ({
       response.headers["cache-control"] = [
         {
           key: "Cache-Control",
-          value: "public, max-age=0, s-maxage=0, must-revalidate" // server error page should not be cached
-        }
+          value: "public, max-age=0, s-maxage=0, must-revalidate", // server error page should not be cached
+        },
       ];
       return response;
     }
@@ -354,15 +352,15 @@ const handleOriginResponse = async ({
     const staticRegenerationResponse = getStaticRegenerationResponse({
       expiresHeader: response.headers?.expires?.[0]?.value || "",
       lastModifiedHeader: response.headers?.["last-modified"]?.[0]?.value || "",
-      initialRevalidateSeconds: staticRoute?.revalidate
+      initialRevalidateSeconds: staticRoute?.revalidate,
     });
 
     if (staticRegenerationResponse) {
       response.headers["cache-control"] = [
         {
           key: "Cache-Control",
-          value: staticRegenerationResponse.cacheControl
-        }
+          value: staticRegenerationResponse.cacheControl,
+        },
       ];
 
       // We don't want the `expires` header to be sent to the client we manage
@@ -388,7 +386,7 @@ const handleOriginResponse = async ({
           eTag: response.headers["etag"]?.[0].value,
           lastModified: response.headers["etag"]?.[0].value,
           pagePath: staticRoute.page,
-          queueName: regenerationQueueName
+          queueName: regenerationQueueName,
         });
 
         // Occasionally we will get rate-limited by the Queue (in the event we
@@ -398,8 +396,8 @@ const handleOriginResponse = async ({
           response.headers["cache-control"] = [
             {
               key: "Cache-Control",
-              value: getThrottledStaticRegenerationCachePolicy(1).cacheControl
-            }
+              value: getThrottledStaticRegenerationCachePolicy(1).cacheControl,
+            },
           ];
         }
       }
@@ -416,8 +414,8 @@ const handleOriginResponse = async ({
   const { req, res, responsePromise } = lambdaAtEdgeCompat(
     event.Records[0].cf,
     {
-      enableHTTPCompression: manifest.enableHTTPCompression
-    }
+      enableHTTPCompression: manifest.enableHTTPCompression,
+    },
   );
 
   const getPage = (pagePath: string) => {
@@ -429,7 +427,7 @@ const handleOriginResponse = async ({
     route,
     manifest,
     routesManifest,
-    getPage
+    getPage,
   );
 
   // Already handled dynamic error path
@@ -439,7 +437,7 @@ const handleOriginResponse = async ({
 
   const s3 = new S3Client({
     region: request.origin?.s3?.region,
-    maxAttempts: 3
+    maxAttempts: 3,
   });
   const s3BasePath = basePath ? `${basePath.replace(/^\//, "")}/` : "";
 
@@ -450,7 +448,7 @@ const handleOriginResponse = async ({
 
     const s3Params = {
       Bucket: bucketName,
-      Key: s3Key
+      Key: s3Key,
     };
 
     const s3Response = await s3.send(new GetObjectCommand(s3Params));
@@ -469,7 +467,7 @@ const handleOriginResponse = async ({
 
     res.writeHead(statusCode, {
       "Cache-Control": cacheControl,
-      "Content-Type": "text/html"
+      "Content-Type": "text/html",
     });
     res.end(bodyBuffer);
     return await responsePromise;
@@ -489,7 +487,7 @@ const handleOriginResponse = async ({
     const redirectResponse = createRedirectResponse(
       redirectPath,
       request.querystring,
-      statusCode
+      statusCode,
     );
 
     redirectByPageProps({ req, res, responsePromise }, redirectResponse);
@@ -504,14 +502,14 @@ const handleOriginResponse = async ({
     buildId: manifest.buildId,
     pageData: renderOpts.pageData,
     region: request.origin?.s3?.region || "",
-    revalidate: renderOpts.revalidate
+    revalidate: renderOpts.revalidate,
   });
 
   const isrResponse = expires
     ? getStaticRegenerationResponse({
         expiresHeader: expires.toJSON(),
         lastModifiedHeader: undefined,
-        initialRevalidateSeconds: staticRoute?.revalidate
+        initialRevalidateSeconds: staticRoute?.revalidate,
       })
     : null;
 
@@ -532,7 +530,7 @@ const handleOriginResponse = async ({
 };
 
 const isOriginResponse = (
-  event: OriginRequestEvent | OriginResponseEvent
+  event: OriginRequestEvent | OriginResponseEvent,
 ): event is OriginResponseEvent => {
   return event.Records[0].cf.config.eventType === "origin-response";
 };

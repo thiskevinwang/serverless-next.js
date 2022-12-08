@@ -1,36 +1,38 @@
-// @ts-ignore
-import PrerenderManifest from "./prerender-manifest.json";
-// @ts-ignore
-import Manifest from "./manifest.json";
-// @ts-ignore
-import RoutesManifestJson from "./routes-manifest.json";
-// @ts-ignore
-import LambdaManifestJson from "./lambda-manifest.json";
+import { AwsPlatformClient } from "@sls-next/aws-common";
 import {
-  defaultHandler,
   PreRenderedManifest as PrerenderManifestType,
   RegenerationEvent,
   RegenerationEventRequest,
+  RoutesManifest,
+  defaultHandler,
   regenerationHandler,
-  RoutesManifest
 } from "@sls-next/core";
-import { AwsPlatformClient } from "@sls-next/aws-common";
-import { BuildManifest, LambdaManifest } from "src/types";
-import { httpCompat } from "src/compat/apigw";
+
 import {
   APIGatewayProxyEventV2,
+  APIGatewayProxyStructuredResultV2,
   SQSEvent,
-  APIGatewayProxyStructuredResultV2
 } from "aws-lambda";
-import Stream from "stream";
 import http from "http";
+import { httpCompat } from "src/compat/apigw";
+import { BuildManifest, LambdaManifest } from "src/types";
+import Stream from "stream";
+
+// @ts-ignore
+import LambdaManifestJson from "./lambda-manifest.json";
+// @ts-ignore
+import Manifest from "./manifest.json";
+// @ts-ignore
+import PrerenderManifest from "./prerender-manifest.json";
+// @ts-ignore
+import RoutesManifestJson from "./routes-manifest.json";
 
 /**
  * Lambda handler that wraps the platform-agnostic default handler.
  * @param event
  */
 export const handleRequest = async (
-  event: APIGatewayProxyEventV2
+  event: APIGatewayProxyEventV2,
 ): Promise<APIGatewayProxyStructuredResultV2> => {
   const manifest: BuildManifest = Manifest;
   const prerenderManifest: PrerenderManifestType = PrerenderManifest;
@@ -49,7 +51,7 @@ export const handleRequest = async (
     bucketName,
     bucketRegion,
     regenerationQueueName,
-    regenerationQueueRegion
+    regenerationQueueRegion,
   );
 
   // Handle request with platform-agnostic handler
@@ -61,9 +63,9 @@ export const handleRequest = async (
     prerenderManifest,
     routesManifest,
     options: {
-      logExecutionTimes: lambdaManifest.logExecutionTimes ?? false
+      logExecutionTimes: lambdaManifest.logExecutionTimes ?? false,
     },
-    platformClient: awsPlatformClient
+    platformClient: awsPlatformClient,
   });
 
   // Convert to API Gateway compatible response
@@ -86,20 +88,20 @@ export const handleRegeneration = async (event: SQSEvent): Promise<void> => {
         regenerationEvent.request;
       const req = Object.assign(
         new Stream.Readable(),
-        http.IncomingMessage.prototype
+        http.IncomingMessage.prototype,
       );
       req.url = originalRequest.url; // this already includes query parameters
       req.headers = originalRequest.headers;
       const res = Object.assign(
         new Stream.Readable(),
-        http.ServerResponse.prototype
+        http.ServerResponse.prototype,
       );
 
       const awsPlatformClient = new AwsPlatformClient(
         lambdaManifest.bucketName,
         lambdaManifest.bucketRegion,
         lambdaManifest.queueName, // we don't need to call the SQS queue as of now, but passing this for future uses
-        lambdaManifest.queueRegion
+        lambdaManifest.queueRegion,
       );
 
       await regenerationHandler({
@@ -107,9 +109,9 @@ export const handleRegeneration = async (event: SQSEvent): Promise<void> => {
         res,
         regenerationEvent,
         manifest,
-        platformClient: awsPlatformClient
+        platformClient: awsPlatformClient,
       });
-    })
+    }),
   );
 };
 
@@ -118,7 +120,7 @@ export const handleRegeneration = async (event: SQSEvent): Promise<void> => {
  * @param event
  */
 export const handler = async (
-  event: SQSEvent | APIGatewayProxyEventV2
+  event: SQSEvent | APIGatewayProxyEventV2,
 ): Promise<void | APIGatewayProxyStructuredResultV2> => {
   if ((event as SQSEvent).Records) {
     await handleRegeneration(event as SQSEvent);

@@ -1,5 +1,6 @@
-import { default as Builder } from "./build";
 import { join } from "path";
+
+import { default as Builder } from "./build";
 
 async function main(args: string[]) {
   if (args.length > 1) {
@@ -14,7 +15,7 @@ async function main(args: string[]) {
     cmd: "./node_modules/.bin/next",
     cwd: process.cwd(),
     env: {},
-    args: ["build"]
+    args: ["build"],
   });
 
   await builder.build();

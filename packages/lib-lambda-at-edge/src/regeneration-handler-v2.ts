@@ -1,15 +1,17 @@
+import { AwsPlatformClient } from "@sls-next/aws-common";
+import {
+  RegenerationEvent,
+  RegenerationEventRequest,
+  regenerationHandler,
+} from "@sls-next/core";
+
+import AWSLambda from "aws-lambda";
+import http from "http";
+import Stream from "stream";
+
 // @ts-ignore
 import Manifest from "./manifest.json";
 import { OriginRequestDefaultHandlerManifest } from "./types";
-import { AwsPlatformClient } from "@sls-next/aws-common";
-import Stream from "stream";
-import http from "http";
-import {
-  regenerationHandler,
-  RegenerationEvent,
-  RegenerationEventRequest
-} from "@sls-next/core";
-import AWSLambda from "aws-lambda";
 
 export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
   await Promise.all(
@@ -22,13 +24,13 @@ export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
         regenerationEvent.request;
       const req = Object.assign(
         new Stream.Readable(),
-        http.IncomingMessage.prototype
+        http.IncomingMessage.prototype,
       );
       req.url = originalRequest.url; // this already includes query parameters
       req.headers = originalRequest.headers;
       const res = Object.assign(
         new Stream.Readable(),
-        http.ServerResponse.prototype
+        http.ServerResponse.prototype,
       );
 
       // TODO: In the future we may want to have bucket details in a manifest instead of the regen event.
@@ -37,7 +39,7 @@ export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
         regenerationEvent.storeName,
         regenerationEvent.storeRegion,
         undefined, // we don't need to call the SQS queue so pass undefined for these
-        undefined
+        undefined,
       );
 
       await regenerationHandler({
@@ -45,8 +47,8 @@ export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
         res,
         regenerationEvent,
         manifest,
-        platformClient: awsPlatformClient
+        platformClient: awsPlatformClient,
       });
-    })
+    }),
   );
 };

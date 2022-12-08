@@ -1,32 +1,33 @@
-// @ts-ignore
-import PrerenderManifest from "./prerender-manifest.json";
-// @ts-ignore
-import Manifest from "./manifest.json";
-// @ts-ignore
-import RoutesManifestJson from "./routes-manifest.json";
-// @ts-ignore
-import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
-import {
-  OriginRequestDefaultHandlerManifest,
-  OriginRequestEvent,
-  OriginResponseEvent
-} from "./types";
-import { CloudFrontResultResponse } from "aws-lambda";
+import { AwsPlatformClient } from "@sls-next/aws-common";
 import {
   PreRenderedManifest as PrerenderManifestType,
   RoutesManifest,
-  defaultHandler
+  defaultHandler,
 } from "@sls-next/core";
+import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
+
+import { CloudFrontResultResponse } from "aws-lambda";
+
 import { removeBlacklistedHeaders } from "./headers/removeBlacklistedHeaders";
+// @ts-ignore
+import Manifest from "./manifest.json";
+// @ts-ignore
+import PrerenderManifest from "./prerender-manifest.json";
+// @ts-ignore
+import RoutesManifestJson from "./routes-manifest.json";
 import { s3BucketNameFromEventRequest } from "./s3/s3BucketNameFromEventRequest";
-import { AwsPlatformClient } from "@sls-next/aws-common";
+import {
+  OriginRequestDefaultHandlerManifest,
+  OriginRequestEvent,
+  OriginResponseEvent,
+} from "./types";
 
 /**
  * V2 Lambda@Edge handler that wraps the platform-agnostic handler.
  * @param event
  */
 export const handler = async (
-  event: OriginRequestEvent | OriginResponseEvent
+  event: OriginRequestEvent | OriginResponseEvent,
 ): Promise<CloudFrontResultResponse> => {
   const manifest: OriginRequestDefaultHandlerManifest = Manifest;
   const prerenderManifest: PrerenderManifestType = PrerenderManifest;
@@ -36,15 +37,15 @@ export const handler = async (
   const { req, res, responsePromise } = lambdaAtEdgeCompat(
     event.Records[0].cf,
     {
-      enableHTTPCompression: manifest.enableHTTPCompression
-    }
+      enableHTTPCompression: manifest.enableHTTPCompression,
+    },
   );
 
   // Initialize AWS platform specific client
   const request = event.Records[0].cf.request;
   const bucketName = s3BucketNameFromEventRequest(request) ?? "";
   const { region: bucketRegion } = request.origin?.s3 || {
-    region: "us-east-1" // default to us-east-1 though it should always be present
+    region: "us-east-1", // default to us-east-1 though it should always be present
   };
   const regenerationQueueRegion = bucketRegion;
   const regenerationQueueName =
@@ -53,7 +54,7 @@ export const handler = async (
     bucketName,
     bucketRegion,
     regenerationQueueName,
-    regenerationQueueRegion
+    regenerationQueueRegion,
   );
 
   // Handle request with platform-agnostic handler
@@ -65,9 +66,9 @@ export const handler = async (
     prerenderManifest,
     routesManifest,
     options: {
-      logExecutionTimes: manifest.logLambdaExecutionTimes ?? false
+      logExecutionTimes: manifest.logLambdaExecutionTimes ?? false,
     },
-    platformClient: awsPlatformClient
+    platformClient: awsPlatformClient,
   });
 
   // Convert to CloudFront compatible response

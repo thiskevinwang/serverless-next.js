@@ -1,25 +1,29 @@
-import { nodeFileTrace, NodeFileTraceReasons } from "@vercel/nft";
-import execa from "execa";
-import fse from "fs-extra";
 import { join } from "path";
 import path from "path";
-import {
-  OriginRequestDefaultHandlerManifest,
-  OriginRequestApiHandlerManifest,
-  RoutesManifest,
-  OriginRequestImageHandlerManifest
-} from "./types";
-import pathToPosix from "@sls-next/core/dist/build/lib/pathToPosix";
-import normalizeNodeModules from "@sls-next/core/dist/build/lib/normalizeNodeModules";
-import createServerlessConfig from "@sls-next/core/dist/build/lib/createServerlessConfig";
-import { isTrailingSlashRedirect } from "@sls-next/core/dist/build/lib/redirector";
-import readDirectoryFiles from "@sls-next/core/dist/build/lib/readDirectoryFiles";
-import filterOutDirectories from "@sls-next/core/dist/build/lib/filterOutDirectories";
-import { Job } from "@vercel/nft/out/node-file-trace";
+
 import { prepareBuildManifests } from "@sls-next/core";
 import { NextConfig } from "@sls-next/core";
+import createServerlessConfig from "@sls-next/core/dist/build/lib/createServerlessConfig";
+import filterOutDirectories from "@sls-next/core/dist/build/lib/filterOutDirectories";
+import normalizeNodeModules from "@sls-next/core/dist/build/lib/normalizeNodeModules";
+import pathToPosix from "@sls-next/core/dist/build/lib/pathToPosix";
+import readDirectoryFiles from "@sls-next/core/dist/build/lib/readDirectoryFiles";
+import { isTrailingSlashRedirect } from "@sls-next/core/dist/build/lib/redirector";
 import { NextI18nextIntegration } from "@sls-next/core/dist/build/third-party/next-i18next";
+
+import { NodeFileTraceReasons, nodeFileTrace } from "@vercel/nft";
+import { Job } from "@vercel/nft/out/node-file-trace";
+import execa from "execa";
+import fse from "fs-extra";
 import normalizePath from "normalize-path";
+
+import { logger } from "./logger";
+import {
+  OriginRequestApiHandlerManifest,
+  OriginRequestDefaultHandlerManifest,
+  OriginRequestImageHandlerManifest,
+  RoutesManifest,
+} from "./types";
 
 export const DEFAULT_LAMBDA_CODE_DIR = "default-lambda";
 export const API_LAMBDA_CODE_DIR = "api-lambda";
@@ -43,7 +47,7 @@ type BuildOptions = {
     id: string,
     parent: string,
     job: Job,
-    cjsResolve: boolean
+    cjsResolve: boolean,
   ) => Promise<string | string[]>;
   baseDir?: string;
   cleanupDotNext?: boolean;
@@ -71,7 +75,7 @@ const defaultBuildOptions = {
   assetIgnorePatterns: [],
   regenerationQueueName: undefined,
   separateApiLambda: true,
-  useV2Handler: false
+  useV2Handler: false,
 };
 
 class Builder {
@@ -86,7 +90,7 @@ class Builder {
     nextConfigDir: string,
     outputDir: string,
     buildOptions?: BuildOptions,
-    nextStaticDir?: string
+    nextStaticDir?: string,
   ) {
     this.nextConfigDir = path.resolve(nextConfigDir);
     this.nextStaticDir = path.resolve(nextStaticDir ?? nextConfigDir);
@@ -99,11 +103,12 @@ class Builder {
   }
 
   async readPublicFiles(assetIgnorePatterns: string[]): Promise<string[]> {
+    logger.info("Reading public files", assetIgnorePatterns);
     const dirExists = await fse.pathExists(join(this.nextConfigDir, "public"));
     if (dirExists) {
       const files = await readDirectoryFiles(
         join(this.nextConfigDir, "public"),
-        assetIgnorePatterns
+        assetIgnorePatterns,
       );
 
       return files
@@ -116,12 +121,13 @@ class Builder {
   }
 
   async readPagesManifest(): Promise<{ [key: string]: string }> {
+    logger.info("Reading pages-manifest.json");
     const path = join(this.serverlessDir, "pages-manifest.json");
     const hasServerlessPageManifest = await fse.pathExists(path);
 
     if (!hasServerlessPageManifest) {
       return Promise.reject(
-        "pages-manifest not found. Check if `next.config.js` target is set to 'serverless'"
+        "pages-manifest not found. Check if `next.config.js` target is set to 'serverless'",
       );
     }
 
@@ -132,7 +138,7 @@ class Builder {
     fileList: string[],
     reasons: NodeFileTraceReasons,
     handlerDirectory: string,
-    base: string
+    base: string,
   ): Promise<void>[] {
     return fileList
       .filter((file) => {
@@ -154,14 +160,14 @@ class Builder {
       .map((filePath: string) => {
         const resolvedFilePath = path.resolve(join(base, filePath));
         const dst = normalizeNodeModules(
-          path.relative(this.serverlessDir, resolvedFilePath)
+          path.relative(this.serverlessDir, resolvedFilePath),
         );
 
         if (resolvedFilePath !== join(this.outputDir, handlerDirectory, dst)) {
           // Only copy when source and destination are different
           return fse.copy(
             resolvedFilePath,
-            join(this.outputDir, handlerDirectory, dst)
+            join(this.outputDir, handlerDirectory, dst),
           );
         } else {
           return Promise.resolve();
@@ -176,7 +182,7 @@ class Builder {
    */
   isSSRJSFile(
     buildManifest: OriginRequestDefaultHandlerManifest,
-    relativePageFile: string
+    relativePageFile: string,
   ): boolean {
     if (path.extname(relativePageFile) === ".js") {
       const page = relativePageFile.startsWith("/")
@@ -201,7 +207,7 @@ class Builder {
    */
   async processAndCopyRoutesManifest(
     source: string,
-    destination: string
+    destination: string,
   ): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const routesManifest = require(source) as RoutesManifest;
@@ -229,14 +235,14 @@ class Builder {
       | "default-handler-v2"
       | "regeneration-handler-v2",
     destination: string,
-    shouldMinify: boolean
+    shouldMinify: boolean,
   ): Promise<void> {
     const source = path.dirname(
       require.resolve(
         `@sls-next/lambda-at-edge/dist/${handlerType}/${
           shouldMinify ? "minified" : "standard"
-        }`
-      )
+        }`,
+      ),
     );
 
     await fse.copy(source, destination);
@@ -244,7 +250,7 @@ class Builder {
 
   async copyTraces(
     buildManifest: OriginRequestDefaultHandlerManifest,
-    destination: string
+    destination: string,
   ): Promise<void> {
     let copyTraces: Promise<void>[] = [];
 
@@ -256,24 +262,25 @@ class Builder {
 
       const allSsrPages = [
         ...Object.values(buildManifest.pages.ssr.nonDynamic),
-        ...Object.values(buildManifest.pages.ssr.dynamic)
+        ...Object.values(buildManifest.pages.ssr.dynamic),
       ].filter(ignoreAppAndDocumentPages);
 
       const ssrPages = Object.values(allSsrPages).map((pageFile) =>
-        path.join(this.serverlessDir, pageFile)
+        path.join(this.serverlessDir, pageFile),
       );
 
       const base = this.buildOptions.baseDir || process.cwd();
       const { fileList, reasons } = await nodeFileTrace(ssrPages, {
         base,
-        resolve: this.buildOptions.resolve
+        resolve: this.buildOptions.resolve,
       });
+      logger.info("Node file trace complete", { fileList, reasons });
 
       copyTraces = this.copyLambdaHandlerDependencies(
         Array.from(fileList),
         reasons,
         destination,
-        base
+        base,
       );
     }
 
@@ -284,10 +291,10 @@ class Builder {
     buildManifest: OriginRequestDefaultHandlerManifest,
     apiBuildManifest: OriginRequestApiHandlerManifest,
     separateApiLambda: boolean,
-    useV2Handler: boolean
+    useV2Handler: boolean,
   ): Promise<void[]> {
     const hasAPIRoutes = await fse.pathExists(
-      join(this.serverlessDir, "pages/api")
+      join(this.serverlessDir, "pages/api"),
     );
 
     return Promise.all([
@@ -295,7 +302,7 @@ class Builder {
       this.processAndCopyHandler(
         useV2Handler ? "default-handler-v2" : "default-handler",
         join(this.outputDir, DEFAULT_LAMBDA_CODE_DIR),
-        !!this.buildOptions.minifyHandlers
+        !!this.buildOptions.minifyHandlers,
       ),
       this.buildOptions?.handler
         ? fse.copy(
@@ -303,13 +310,13 @@ class Builder {
             join(
               this.outputDir,
               DEFAULT_LAMBDA_CODE_DIR,
-              this.buildOptions.handler
-            )
+              this.buildOptions.handler,
+            ),
           )
         : Promise.resolve(),
       fse.writeJson(
         join(this.outputDir, DEFAULT_LAMBDA_CODE_DIR, "manifest.json"),
-        buildManifest
+        buildManifest,
       ),
       fse.copy(
         join(this.serverlessDir, "pages"),
@@ -335,8 +342,8 @@ class Builder {
               this.isSSRJSFile(
                 buildManifest,
                 pathToPosix(
-                  path.relative(path.join(this.serverlessDir, "pages"), file)
-                ) // important: make sure to use posix path to generate forward-slash path across both posix/windows
+                  path.relative(path.join(this.serverlessDir, "pages"), file),
+                ), // important: make sure to use posix path to generate forward-slash path across both posix/windows
               );
 
             return (
@@ -345,28 +352,32 @@ class Builder {
               isNotStaticPropsJSONFile &&
               isNotExcludedJSFile
             );
-          }
-        }
+          },
+        },
       ),
       this.copyJSFiles(DEFAULT_LAMBDA_CODE_DIR),
       this.copyChunks(DEFAULT_LAMBDA_CODE_DIR),
       fse.copy(
         join(this.dotNextDir, "prerender-manifest.json"),
-        join(this.outputDir, DEFAULT_LAMBDA_CODE_DIR, "prerender-manifest.json")
+        join(
+          this.outputDir,
+          DEFAULT_LAMBDA_CODE_DIR,
+          "prerender-manifest.json",
+        ),
       ),
       this.processAndCopyRoutesManifest(
         join(this.dotNextDir, "routes-manifest.json"),
-        join(this.outputDir, DEFAULT_LAMBDA_CODE_DIR, "routes-manifest.json")
+        join(this.outputDir, DEFAULT_LAMBDA_CODE_DIR, "routes-manifest.json"),
       ),
       this.runThirdPartyIntegrations(
         join(this.outputDir, DEFAULT_LAMBDA_CODE_DIR),
-        join(this.outputDir, REGENERATION_LAMBDA_CODE_DIR)
-      )
+        join(this.outputDir, REGENERATION_LAMBDA_CODE_DIR),
+      ),
     ]);
   }
 
   async buildApiLambda(
-    apiBuildManifest: OriginRequestApiHandlerManifest
+    apiBuildManifest: OriginRequestApiHandlerManifest,
   ): Promise<void[]> {
     let copyTraces: Promise<void>[] = [];
 
@@ -374,25 +385,25 @@ class Builder {
       const allApiPages = [
         ...Object.values(apiBuildManifest.apis.nonDynamic),
         ...Object.values(apiBuildManifest.apis.dynamic).map(
-          (entry) => entry.file
-        )
+          (entry) => entry.file,
+        ),
       ];
 
       const apiPages = Object.values(allApiPages).map((pageFile) =>
-        path.join(this.serverlessDir, pageFile)
+        path.join(this.serverlessDir, pageFile),
       );
 
       const base = this.buildOptions.baseDir || process.cwd();
       const { fileList, reasons } = await nodeFileTrace(apiPages, {
         base,
-        resolve: this.buildOptions.resolve
+        resolve: this.buildOptions.resolve,
       });
 
       copyTraces = this.copyLambdaHandlerDependencies(
         Array.from(fileList),
         reasons,
         API_LAMBDA_CODE_DIR,
-        base
+        base,
       );
     }
 
@@ -401,45 +412,49 @@ class Builder {
       this.processAndCopyHandler(
         "api-handler",
         join(this.outputDir, API_LAMBDA_CODE_DIR),
-        !!this.buildOptions.minifyHandlers
+        !!this.buildOptions.minifyHandlers,
       ),
       this.buildOptions?.handler
         ? fse.copy(
             join(this.nextConfigDir, this.buildOptions.handler),
-            join(this.outputDir, API_LAMBDA_CODE_DIR, this.buildOptions.handler)
+            join(
+              this.outputDir,
+              API_LAMBDA_CODE_DIR,
+              this.buildOptions.handler,
+            ),
           )
         : Promise.resolve(),
       fse.copy(
         join(this.serverlessDir, "pages/api"),
-        join(this.outputDir, API_LAMBDA_CODE_DIR, "pages/api")
+        join(this.outputDir, API_LAMBDA_CODE_DIR, "pages/api"),
       ),
       this.copyJSFiles(API_LAMBDA_CODE_DIR),
       this.copyChunks(API_LAMBDA_CODE_DIR),
       fse.writeJson(
         join(this.outputDir, API_LAMBDA_CODE_DIR, "manifest.json"),
-        apiBuildManifest
+        apiBuildManifest,
       ),
       this.processAndCopyRoutesManifest(
         join(this.dotNextDir, "routes-manifest.json"),
-        join(this.outputDir, API_LAMBDA_CODE_DIR, "routes-manifest.json")
-      )
+        join(this.outputDir, API_LAMBDA_CODE_DIR, "routes-manifest.json"),
+      ),
     ]);
   }
 
   async buildRegenerationHandler(
     buildManifest: OriginRequestDefaultHandlerManifest,
-    useV2Handler: boolean
+    useV2Handler: boolean,
   ): Promise<void> {
     await Promise.all([
       this.copyTraces(buildManifest, REGENERATION_LAMBDA_CODE_DIR),
       fse.writeJson(
         join(this.outputDir, REGENERATION_LAMBDA_CODE_DIR, "manifest.json"),
-        buildManifest
+        buildManifest,
       ),
       this.processAndCopyHandler(
         useV2Handler ? "regeneration-handler-v2" : "regeneration-handler",
         join(this.outputDir, REGENERATION_LAMBDA_CODE_DIR),
-        !!this.buildOptions.minifyHandlers
+        !!this.buildOptions.minifyHandlers,
       ),
       this.copyJSFiles(REGENERATION_LAMBDA_CODE_DIR),
       this.copyChunks(REGENERATION_LAMBDA_CODE_DIR),
@@ -457,9 +472,9 @@ class Builder {
               isNotStaticPropsJSONFile &&
               isNotApiPage
             );
-          }
-        }
-      )
+          },
+        },
+      ),
     ]);
   }
 
@@ -471,7 +486,7 @@ class Builder {
       fse.existsSync(join(this.serverlessDir, "chunks"))
       ? fse.copy(
           join(this.serverlessDir, "chunks"),
-          join(this.outputDir, handlerDir, "chunks")
+          join(this.outputDir, handlerDir, "chunks"),
         )
       : Promise.resolve();
   }
@@ -484,15 +499,15 @@ class Builder {
       (await fse.pathExists(join(this.serverlessDir, "webpack-api-runtime.js")))
         ? fse.copy(
             join(this.serverlessDir, "webpack-api-runtime.js"),
-            join(this.outputDir, handlerDir, "webpack-api-runtime.js")
+            join(this.outputDir, handlerDir, "webpack-api-runtime.js"),
           )
         : Promise.resolve(),
       (await fse.pathExists(join(this.serverlessDir, "webpack-runtime.js")))
         ? fse.copy(
             join(this.serverlessDir, "webpack-runtime.js"),
-            join(this.outputDir, handlerDir, "webpack-runtime.js")
+            join(this.outputDir, handlerDir, "webpack-runtime.js"),
           )
-        : Promise.resolve()
+        : Promise.resolve(),
     ]);
   }
 
@@ -501,13 +516,13 @@ class Builder {
    * @param buildManifest
    */
   async buildImageLambda(
-    buildManifest: OriginRequestImageHandlerManifest
+    buildManifest: OriginRequestImageHandlerManifest,
   ): Promise<void> {
     await Promise.all([
       this.processAndCopyHandler(
         "image-handler",
         join(this.outputDir, IMAGE_LAMBDA_CODE_DIR),
-        !!this.buildOptions.minifyHandlers
+        !!this.buildOptions.minifyHandlers,
       ),
       this.buildOptions?.handler
         ? fse.copy(
@@ -515,30 +530,30 @@ class Builder {
             join(
               this.outputDir,
               IMAGE_LAMBDA_CODE_DIR,
-              this.buildOptions.handler
-            )
+              this.buildOptions.handler,
+            ),
           )
         : Promise.resolve(),
       fse.writeJson(
         join(this.outputDir, IMAGE_LAMBDA_CODE_DIR, "manifest.json"),
-        buildManifest
+        buildManifest,
       ),
       this.processAndCopyRoutesManifest(
         join(this.dotNextDir, "routes-manifest.json"),
-        join(this.outputDir, IMAGE_LAMBDA_CODE_DIR, "routes-manifest.json")
+        join(this.outputDir, IMAGE_LAMBDA_CODE_DIR, "routes-manifest.json"),
       ),
       fse.copy(
         join(
           path.dirname(require.resolve("@sls-next/core/package.json")),
           "dist",
-          "sharp_node_modules"
+          "sharp_node_modules",
         ),
-        join(this.outputDir, IMAGE_LAMBDA_CODE_DIR, "node_modules")
+        join(this.outputDir, IMAGE_LAMBDA_CODE_DIR, "node_modules"),
       ),
       fse.copy(
         join(this.dotNextDir, "images-manifest.json"),
-        join(this.outputDir, IMAGE_LAMBDA_CODE_DIR, "images-manifest.json")
-      )
+        join(this.outputDir, IMAGE_LAMBDA_CODE_DIR, "images-manifest.json"),
+      ),
     ]);
   }
 
@@ -566,7 +581,7 @@ class Builder {
   async buildStaticAssets(
     defaultBuildManifest: OriginRequestDefaultHandlerManifest,
     routesManifest: RoutesManifest,
-    ignorePatterns: string[]
+    ignorePatterns: string[],
   ) {
     const buildId = defaultBuildManifest.buildId;
     const basePath = routesManifest.basePath;
@@ -583,7 +598,7 @@ class Builder {
 
     const copyIfExists = async (
       source: string,
-      destination: string
+      destination: string,
     ): Promise<void> => {
       if (await fse.pathExists(source)) {
         await fse.copy(source, destination);
@@ -593,12 +608,12 @@ class Builder {
     // Copy BUILD_ID file
     const copyBuildId = copyIfExists(
       path.join(dotNextDirectory, "BUILD_ID"),
-      path.join(assetOutputDirectory, withBasePath("BUILD_ID"))
+      path.join(assetOutputDirectory, withBasePath("BUILD_ID")),
     );
 
     const buildStaticFiles = await readDirectoryFiles(
       path.join(dotNextDirectory, "static"),
-      ignorePatterns
+      ignorePatterns,
     );
 
     const staticFileAssets = buildStaticFiles
@@ -610,8 +625,8 @@ class Builder {
           withBasePath(
             path
               .relative(path.resolve(nextConfigDir), source)
-              .replace(/^.next/, "_next")
-          )
+              .replace(/^.next/, "_next"),
+          ),
         );
 
         return copyIfExists(source, destination);
@@ -619,7 +634,7 @@ class Builder {
 
     const htmlPaths = [
       ...Object.keys(defaultBuildManifest.pages.html.dynamic),
-      ...Object.keys(defaultBuildManifest.pages.html.nonDynamic)
+      ...Object.keys(defaultBuildManifest.pages.html.nonDynamic),
     ];
 
     const ssgPaths = Object.keys(defaultBuildManifest.pages.ssg.nonDynamic);
@@ -640,7 +655,7 @@ class Builder {
       const source = path.join(dotNextDirectory, `serverless/pages${file}`);
       const destination = path.join(
         assetOutputDirectory,
-        withBasePath(`static-pages/${buildId}${file}`)
+        withBasePath(`static-pages/${buildId}${file}`),
       );
 
       return copyIfExists(source, destination);
@@ -650,7 +665,7 @@ class Builder {
       const source = path.join(dotNextDirectory, `serverless/pages${file}`);
       const destination = path.join(
         assetOutputDirectory,
-        withBasePath(`_next/data/${buildId}${file}`)
+        withBasePath(`_next/data/${buildId}${file}`),
       );
 
       return copyIfExists(source, destination);
@@ -659,12 +674,12 @@ class Builder {
     // Check if public/static exists and fail build since this conflicts with static/* behavior.
     if (await fse.pathExists(path.join(nextStaticDir, "public", "static"))) {
       throw new Error(
-        "You cannot have assets in the directory [public/static] as they conflict with the static/* CloudFront cache behavior. Please move these assets into another directory."
+        "You cannot have assets in the directory [public/static] as they conflict with the static/* CloudFront cache behavior. Please move these assets into another directory.",
       );
     }
 
     const buildPublicOrStaticDirectory = async (
-      directory: "public" | "static"
+      directory: "public" | "static",
     ) => {
       const directoryPath = path.join(nextStaticDir, directory);
       if (!(await fse.pathExists(directoryPath))) {
@@ -678,8 +693,8 @@ class Builder {
         const destination = path.join(
           assetOutputDirectory,
           withBasePath(
-            path.relative(path.resolve(nextStaticDir), fileItem.path)
-          )
+            path.relative(path.resolve(nextStaticDir), fileItem.path),
+          ),
         );
 
         return fse.copy(source, destination);
@@ -688,7 +703,7 @@ class Builder {
 
     const [publicDirAssets, staticDirAssets] = await Promise.all([
       buildPublicOrStaticDirectory("public"),
-      buildPublicOrStaticDirectory("static")
+      buildPublicOrStaticDirectory("static"),
     ]);
 
     return Promise.all([
@@ -697,7 +712,7 @@ class Builder {
       ...htmlAssets, // prerendered html pages
       ...jsonAssets, // SSG json files
       ...publicDirAssets, // public dir
-      ...staticDirAssets // static dir
+      ...staticDirAssets, // static dir
     ]);
   }
 
@@ -714,9 +729,9 @@ class Builder {
       await Promise.all(
         fileItems
           .filter(
-            (fileItem) => fileItem !== "cache" // avoid deleting the cache folder as that leads to slow next builds!
+            (fileItem) => fileItem !== "cache", // avoid deleting the cache folder as that leads to slow next builds!
           )
-          .map((fileItem) => fse.remove(join(this.dotNextDir, fileItem)))
+          .map((fileItem) => fse.remove(join(this.dotNextDir, fileItem))),
       );
     }
   }
@@ -731,7 +746,7 @@ class Builder {
       cleanupDotNext,
       assetIgnorePatterns,
       separateApiLambda,
-      useV2Handler
+      useV2Handler,
     } = Object.assign(defaultBuildOptions, this.buildOptions);
 
     await Promise.all([
@@ -740,19 +755,19 @@ class Builder {
       fse.emptyDir(join(this.outputDir, API_LAMBDA_CODE_DIR)),
       fse.emptyDir(join(this.outputDir, IMAGE_LAMBDA_CODE_DIR)),
       fse.emptyDir(join(this.outputDir, REGENERATION_LAMBDA_CODE_DIR)),
-      fse.emptyDir(join(this.outputDir, ASSETS_DIR))
+      fse.emptyDir(join(this.outputDir, ASSETS_DIR)),
     ]);
 
     const { restoreUserConfig } = await createServerlessConfig(
       cwd,
       path.join(this.nextConfigDir),
-      useServerlessTraceTarget
+      useServerlessTraceTarget,
     );
 
     try {
       const subprocess = execa(cmd, args, {
         cwd,
-        env
+        env,
       });
 
       if (debugMode) {
@@ -768,22 +783,22 @@ class Builder {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const routesManifest = require(join(
       this.dotNextDir,
-      "routes-manifest.json"
+      "routes-manifest.json",
     ));
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const prerenderManifest = require(join(
       this.dotNextDir,
-      "prerender-manifest.json"
+      "prerender-manifest.json",
     ));
 
     const options = {
       buildId: await fse.readFile(
         path.join(this.dotNextDir, "BUILD_ID"),
-        "utf-8"
+        "utf-8",
       ),
       ...this.buildOptions,
-      domainRedirects: this.buildOptions.domainRedirects ?? {}
+      domainRedirects: this.buildOptions.domainRedirects ?? {},
     };
 
     const { apiManifest, imageManifest, pageManifest } =
@@ -793,37 +808,37 @@ class Builder {
         routesManifest,
         await this.readPagesManifest(),
         prerenderManifest,
-        await this.readPublicFiles(assetIgnorePatterns)
+        await this.readPublicFiles(assetIgnorePatterns),
       );
 
     const {
       enableHTTPCompression,
       logLambdaExecutionTimes,
       regenerationQueueName,
-      disableOriginResponseHandler
+      disableOriginResponseHandler,
     } = this.buildOptions;
 
     const apiBuildManifest = {
       ...apiManifest,
-      enableHTTPCompression
+      enableHTTPCompression,
     };
     const defaultBuildManifest = {
       ...pageManifest,
       enableHTTPCompression,
       logLambdaExecutionTimes,
       regenerationQueueName,
-      disableOriginResponseHandler
+      disableOriginResponseHandler,
     };
     const imageBuildManifest = {
       ...imageManifest,
-      enableHTTPCompression
+      enableHTTPCompression,
     };
 
     await this.buildDefaultLambda(
       defaultBuildManifest,
       apiBuildManifest,
       separateApiLambda,
-      useV2Handler
+      useV2Handler,
     );
     await this.buildRegenerationHandler(defaultBuildManifest, useV2Handler);
 
@@ -838,7 +853,7 @@ class Builder {
 
     // If using Next.j 10, then images-manifest.json is present and image optimizer can be used
     const hasImagesManifest = fse.existsSync(
-      join(this.dotNextDir, "images-manifest.json")
+      join(this.dotNextDir, "images-manifest.json"),
     );
 
     // However if using a non-default loader, the lambda is not needed
@@ -851,7 +866,7 @@ class Builder {
 
     // ...nor if the image component is not used
     const exportMarker = fse.existsSync(
-      join(this.dotNextDir, "export-marker.json")
+      join(this.dotNextDir, "export-marker.json"),
     )
       ? await fse.readJSON(path.join(this.dotNextDir, "export-marker.json"))
       : {};
@@ -865,7 +880,7 @@ class Builder {
     await this.buildStaticAssets(
       defaultBuildManifest,
       routesManifest,
-      assetIgnorePatterns
+      assetIgnorePatterns,
     );
   }
 
@@ -877,17 +892,17 @@ class Builder {
    */
   async runThirdPartyIntegrations(
     defaultLambdaDir: string,
-    regenerationLambdaDir: string
+    regenerationLambdaDir: string,
   ): Promise<void> {
     await Promise.all([
       new NextI18nextIntegration(
         this.nextConfigDir,
-        defaultLambdaDir
+        defaultLambdaDir,
       ).execute(),
       new NextI18nextIntegration(
         this.nextConfigDir,
-        regenerationLambdaDir
-      ).execute()
+        regenerationLambdaDir,
+      ).execute(),
     ]);
   }
 }

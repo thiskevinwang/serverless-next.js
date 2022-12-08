@@ -1,14 +1,13 @@
+import { ApiManifest, PageManifest } from "@sls-next/core/src/types";
+
 import type {
-  CloudFrontRequest,
   CloudFrontEvent,
-  CloudFrontResponse
+  CloudFrontRequest,
+  CloudFrontResponse,
 } from "aws-lambda";
-import { ApiManifest, PageManifest } from "@sls-next/core/dist/module/types";
-export {
-  ImageConfig,
-  ImagesManifest
-} from "@sls-next/core/dist/module/build/types";
-export { RoutesManifest } from "@sls-next/core/dist/module/types";
+
+export { ImageConfig, ImagesManifest } from "@sls-next/core/src/build/types";
+export { RoutesManifest } from "@sls-next/core/src/types";
 
 export type OriginRequestApiHandlerManifest = ApiManifest & {
   enableHTTPCompression?: boolean;
@@ -30,7 +29,7 @@ export type OriginRequestImageHandlerManifest = {
 
 export type OriginRequestEvent = {
   Records: [
-    { cf: { request: CloudFrontRequest; config: CloudFrontEvent["config"] } }
+    { cf: { request: CloudFrontRequest; config: CloudFrontEvent["config"] } },
   ];
 };
 
@@ -42,7 +41,7 @@ export type OriginResponseEvent = {
         response: CloudFrontResponse;
         config: CloudFrontEvent["config"];
       };
-    }
+    },
   ];
 };
 

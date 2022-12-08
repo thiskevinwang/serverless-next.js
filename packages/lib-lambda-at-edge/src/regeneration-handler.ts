@@ -1,12 +1,13 @@
+import { renderPageToHtml } from "@sls-next/core";
 import lambdaAtEdgeCompat from "@sls-next/next-aws-cloudfront";
+
 // @ts-ignore
 import Manifest from "./manifest.json";
+import { s3StorePage } from "./s3/s3StorePage";
 import {
   OriginRequestDefaultHandlerManifest,
-  RegenerationEvent
+  RegenerationEvent,
 } from "./types";
-import { s3StorePage } from "./s3/s3StorePage";
-import { renderPageToHtml } from "@sls-next/core";
 
 export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
   await Promise.all(
@@ -16,7 +17,7 @@ export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
       const manifest: OriginRequestDefaultHandlerManifest = Manifest;
       const { req, res } = lambdaAtEdgeCompat(
         { request: regenerationEvent.cloudFrontEventRequest },
-        { enableHTTPCompression: manifest.enableHTTPCompression }
+        { enableHTTPCompression: manifest.enableHTTPCompression },
       );
 
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -26,7 +27,7 @@ export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
         page,
         req,
         res,
-        "passthrough"
+        "passthrough",
       );
 
       const normalizedUri = decodeURI(regenerationEvent.pageS3Path)
@@ -41,8 +42,8 @@ export const handler = async (event: AWSLambda.SQSEvent): Promise<void> => {
         buildId: manifest.buildId,
         pageData: renderOpts.pageData,
         region: regenerationEvent.region,
-        revalidate: renderOpts.revalidate as number
+        revalidate: renderOpts.revalidate as number,
       });
-    })
+    }),
   );
 };
