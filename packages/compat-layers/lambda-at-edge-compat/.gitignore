@@ -1,9 +1,0 @@
-dist/api/post-comment.js
-yarn-debug.log*
-yarn-error.log*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/sdks
-!.yarn/versions

@@ -25,7 +25,7 @@
     "lint": "eslint .",
     "integration": "jest --runInBand --config jest.integration.config.json --setupTestFrameworkScriptFile=./jest.integration.setup.js",
     "integration:ci": "jest --runInBand --config jest.integration.config.json --setupTestFrameworkScriptFile=./jest.integration.setup.js --ci --reporters=default --reporters=jest-junit",
-    "build": "lerna run build && opencollective-postinstall",
+    "build": "lerna run build",
     "clean": "lerna run clean",
     "docs": "cd documentation && yarn && yarn build",
     "handlers:upload-handler-sizes": "ts-node scripts/upload-handler-sizes.ts",
@@ -69,10 +69,6 @@
   "dependencies": {
     "opencollective-postinstall": "^2.0.3"
   },
-  "collective": {
-    "type": "opencollective",
-    "url": "https://opencollective.com/serverless-nextjs-plugin"
-  },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,md,yml}": [
       "prettier --write"
@@ -81,12 +77,6 @@
       "eslint --fix"
     ]
   },
-  "resolutions": {
-    "@serverless/cli": "^1.6.0",
-    "which": "^2.0.2",
-    "lodash": "^4.17.21"
-  },
-  "packageManager": "yarn@3.1.1",
   "workspaces": [
     "packages/compat-layers/*",
     "packages/serverless-components/*",

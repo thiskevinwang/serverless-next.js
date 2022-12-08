@@ -1,1 +1,0 @@
-Patched serverless binary
