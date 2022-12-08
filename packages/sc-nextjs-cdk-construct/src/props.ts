@@ -1,5 +1,9 @@
 import { ICertificate } from "aws-cdk-lib/aws-certificatemanager";
-import { BehaviorOptions, DistributionProps, CachePolicy } from "aws-cdk-lib/aws-cloudfront";
+import {
+  BehaviorOptions,
+  DistributionProps,
+  CachePolicy
+} from "aws-cdk-lib/aws-cloudfront";
 import { Runtime } from "aws-cdk-lib/aws-lambda";
 import { IHostedZone } from "aws-cdk-lib/aws-route53";
 import { BucketProps } from "aws-cdk-lib/aws-s3";
@@ -15,6 +19,7 @@ export type LambdaOption<T> =
     };
 
 export interface Props extends StackProps {
+  test: string;
   /**
    * The directory that holds the output from the serverless builder.
    *

@@ -152,7 +152,9 @@ export class NextJSLambdaEdge extends Construct {
     }
 
     this.defaultNextLambda = new lambda.Function(this, "NextLambda", {
-      architecture: lambda.Architecture.ARM_64,
+      // WARNING
+      // Lambda@Edge does not support functions with an architecture of arm64
+      // architecture: lambda.Architecture.ARM_64,
       functionName: toLambdaOption("defaultLambda", props.name),
       description: `Default Lambda@Edge for Next CloudFront distribution`,
       handler: props.handler || "index.handler",
@@ -190,7 +192,7 @@ export class NextJSLambdaEdge extends Construct {
     this.nextApiLambda = null;
     if (hasAPIPages) {
       this.nextApiLambda = new lambda.Function(this, "NextApiLambda", {
-        architecture: lambda.Architecture.ARM_64,
+        // architecture: lambda.Architecture.ARM_64,
         functionName: toLambdaOption("apiLambda", props.name),
         description: `Default Lambda@Edge for Next API CloudFront distribution`,
         handler: "index.handler",
@@ -216,7 +218,7 @@ export class NextJSLambdaEdge extends Construct {
     this.nextImageLambda = null;
     if (this.imageManifest) {
       this.nextImageLambda = new lambda.Function(this, "NextImageLambda", {
-        architecture: lambda.Architecture.ARM_64,
+        // architecture: lambda.Architecture.ARM_64,
         functionName: toLambdaOption("imageLambda", props.name),
         description: `Default Lambda@Edge for Next Image CloudFront distribution`,
         handler: "index.handler",

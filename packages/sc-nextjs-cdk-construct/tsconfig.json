@@ -8,7 +8,7 @@
     "moduleResolution": "node",
     "outDir": "dist",
     "sourceMap": true,
-    "strict": true,
+    "strict": false,
     "allowJs": true,
     "skipLibCheck": true
   },
