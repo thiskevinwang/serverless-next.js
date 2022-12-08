@@ -154,7 +154,9 @@ class Builder {
         const reason = reasons.get(file);
 
         return (
-          (!reason || reason.type !== "initial") && file !== "package.json"
+          //
+          (!reason || !reason.type.includes("initial")) &&
+          file !== "package.json"
         );
       })
       .map((filePath: string) => {

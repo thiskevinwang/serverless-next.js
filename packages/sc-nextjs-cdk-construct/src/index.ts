@@ -1,38 +1,41 @@
-import * as cdk from "aws-cdk-lib";
-import * as lambda from "aws-cdk-lib/aws-lambda";
-import * as s3 from "aws-cdk-lib/aws-s3";
-import * as logs from "aws-cdk-lib/aws-logs";
-import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
-import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
-import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
-import { ARecord, RecordTarget } from "aws-cdk-lib/aws-route53";
-import * as sqs from "aws-cdk-lib/aws-sqs";
-import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as path from "path";
+
+import { PreRenderedManifest } from "@sls-next/core";
 import {
-  OriginRequestImageHandlerManifest,
   OriginRequestApiHandlerManifest,
   OriginRequestDefaultHandlerManifest,
-  RoutesManifest
+  OriginRequestImageHandlerManifest,
+  RoutesManifest,
 } from "@sls-next/lambda-at-edge";
-import { PreRenderedManifest } from "@sls-next/core";
-import * as fs from "fs-extra";
-import * as path from "path";
-import {
-  Role,
-  ManagedPolicy,
-  ServicePrincipal,
-  CompositePrincipal
-} from "aws-cdk-lib/aws-iam";
+
+import * as cdk from "aws-cdk-lib";
 import { Duration, RemovalPolicy } from "aws-cdk-lib";
-import { CloudFrontTarget } from "aws-cdk-lib/aws-route53-targets";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import { OriginRequestQueryStringBehavior } from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
+import {
+  CompositePrincipal,
+  ManagedPolicy,
+  Role,
+  ServicePrincipal,
+} from "aws-cdk-lib/aws-iam";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as lambdaEventSources from "aws-cdk-lib/aws-lambda-event-sources";
+import * as logs from "aws-cdk-lib/aws-logs";
+import { ARecord, RecordTarget } from "aws-cdk-lib/aws-route53";
+import { CloudFrontTarget } from "aws-cdk-lib/aws-route53-targets";
+import * as s3 from "aws-cdk-lib/aws-s3";
+import * as s3Deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as sqs from "aws-cdk-lib/aws-sqs";
+import { Construct } from "constructs";
+import * as fs from "fs-extra";
+
 import { Props } from "./props";
-import { toLambdaOption } from "./utils/toLambdaOption";
+import pathToPosix from "./utils/pathToPosix";
 import { readAssetsDirectory } from "./utils/readAssetsDirectory";
 import { readInvalidationPathsFromManifest } from "./utils/readInvalidationPathsFromManifest";
 import { reduceInvalidationPaths } from "./utils/reduceInvalidationPaths";
-import pathToPosix from "./utils/pathToPosix";
-import { Construct } from "constructs";
+import { toLambdaOption } from "./utils/toLambdaOption";
 
 export * from "./props";
 
@@ -87,33 +90,33 @@ export class NextJSLambdaEdge extends Construct {
       autoDeleteObjects: true,
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       // Override props.
-      ...(props.s3Props || {})
+      ...(props.s3Props || {}),
     });
 
     this.edgeLambdaRole = new Role(this, "NextEdgeLambdaRole", {
       assumedBy: new CompositePrincipal(
         new ServicePrincipal("lambda.amazonaws.com"),
-        new ServicePrincipal("edgelambda.amazonaws.com")
+        new ServicePrincipal("edgelambda.amazonaws.com"),
       ),
       managedPolicies: [
         ManagedPolicy.fromManagedPolicyArn(
           this,
           "NextApiLambdaPolicy",
-          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-        )
-      ]
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+        ),
+      ],
     });
 
     const hasISRPages = Object.keys(this.prerenderManifest.routes).some(
       (key) =>
         typeof this.prerenderManifest.routes[key].initialRevalidateSeconds ===
-        "number"
+        "number",
     );
 
     const hasDynamicISRPages = Object.keys(
-      this.prerenderManifest.dynamicRoutes
+      this.prerenderManifest.dynamicRoutes,
     ).some(
-      (key) => this.prerenderManifest.dynamicRoutes[key].fallback !== false
+      (key) => this.prerenderManifest.dynamicRoutes[key].fallback !== false,
     );
 
     if (hasISRPages || hasDynamicISRPages) {
@@ -123,7 +126,7 @@ export class NextJSLambdaEdge extends Construct {
         // in a lambda@edge
         queueName: `${this.bucket.bucketName}.fifo`,
         fifo: true,
-        removalPolicy: cdk.RemovalPolicy.DESTROY
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
       });
 
       this.regenerationFunction = new lambda.Function(
@@ -133,7 +136,7 @@ export class NextJSLambdaEdge extends Construct {
           architecture: lambda.Architecture.ARM_64,
           handler: "index.handler",
           code: lambda.Code.fromAsset(
-            path.join(this.props.serverlessBuildOutDir, "regeneration-lambda")
+            path.join(this.props.serverlessBuildOutDir, "regeneration-lambda"),
           ),
           runtime:
             toLambdaOption("regenerationLambda", props.runtime) ??
@@ -142,12 +145,12 @@ export class NextJSLambdaEdge extends Construct {
             toLambdaOption("regenerationLambda", props.memory) ?? undefined,
           timeout:
             toLambdaOption("regenerationLambda", props.timeout) ??
-            Duration.seconds(30)
-        }
+            Duration.seconds(30),
+        },
       );
 
       this.regenerationFunction.addEventSource(
-        new lambdaEventSources.SqsEventSource(this.regenerationQueue)
+        new lambdaEventSources.SqsEventSource(this.regenerationQueue),
       );
     }
 
@@ -159,11 +162,11 @@ export class NextJSLambdaEdge extends Construct {
       description: `Default Lambda@Edge for Next CloudFront distribution`,
       handler: props.handler || "index.handler",
       currentVersionOptions: {
-        removalPolicy: RemovalPolicy.RETAIN // retain old versions to prevent premature removal, cleanup via trigger later on
+        removalPolicy: RemovalPolicy.RETAIN, // retain old versions to prevent premature removal, cleanup via trigger later on
       },
       logRetention: logs.RetentionDays.THREE_DAYS,
       code: lambda.Code.fromAsset(
-        path.join(this.props.serverlessBuildOutDir, "default-lambda")
+        path.join(this.props.serverlessBuildOutDir, "default-lambda"),
       ),
       role: this.edgeLambdaRole,
       runtime:
@@ -171,11 +174,15 @@ export class NextJSLambdaEdge extends Construct {
         lambda.Runtime.NODEJS_18_X,
       memorySize: toLambdaOption("defaultLambda", props.memory) ?? 512,
       timeout:
-        toLambdaOption("defaultLambda", props.timeout) ?? Duration.seconds(10)
+        toLambdaOption("defaultLambda", props.timeout) ?? Duration.seconds(10),
     });
 
     this.bucket.grantReadWrite(this.defaultNextLambda);
-    this.defaultNextLambda.currentVersion.addAlias("live");
+
+    new lambda.Alias(this, "NextDefaultLambdaAlias", {
+      version: this.defaultNextLambda.currentVersion,
+      aliasName: "live",
+    });
 
     if ((hasISRPages || hasDynamicISRPages) && this.regenerationFunction) {
       this.bucket.grantReadWrite(this.regenerationFunction);
@@ -198,11 +205,11 @@ export class NextJSLambdaEdge extends Construct {
         handler: "index.handler",
         currentVersionOptions: {
           removalPolicy: RemovalPolicy.DESTROY, // destroy old versions
-          retryAttempts: 1 // async retry attempts
+          retryAttempts: 1, // async retry attempts
         },
         logRetention: logs.RetentionDays.THREE_DAYS,
         code: lambda.Code.fromAsset(
-          path.join(this.props.serverlessBuildOutDir, "api-lambda")
+          path.join(this.props.serverlessBuildOutDir, "api-lambda"),
         ),
         role: this.edgeLambdaRole,
         runtime:
@@ -210,9 +217,13 @@ export class NextJSLambdaEdge extends Construct {
           lambda.Runtime.NODEJS_18_X,
         memorySize: toLambdaOption("apiLambda", props.memory) ?? 512,
         timeout:
-          toLambdaOption("apiLambda", props.timeout) ?? Duration.seconds(10)
+          toLambdaOption("apiLambda", props.timeout) ?? Duration.seconds(10),
       });
-      this.nextApiLambda.currentVersion.addAlias("live");
+
+      new lambda.Alias(this, "NextApiLambdaAlias", {
+        version: this.nextApiLambda.currentVersion,
+        aliasName: "live",
+      });
     }
 
     this.nextImageLambda = null;
@@ -224,11 +235,11 @@ export class NextJSLambdaEdge extends Construct {
         handler: "index.handler",
         currentVersionOptions: {
           removalPolicy: RemovalPolicy.DESTROY, // destroy old versions
-          retryAttempts: 1 // async retry attempts
+          retryAttempts: 1, // async retry attempts
         },
         logRetention: logs.RetentionDays.THREE_DAYS,
         code: lambda.Code.fromAsset(
-          path.join(this.props.serverlessBuildOutDir, "image-lambda")
+          path.join(this.props.serverlessBuildOutDir, "image-lambda"),
         ),
         role: this.edgeLambdaRole,
         runtime:
@@ -236,9 +247,12 @@ export class NextJSLambdaEdge extends Construct {
           lambda.Runtime.NODEJS_18_X,
         memorySize: toLambdaOption("imageLambda", props.memory) ?? 512,
         timeout:
-          toLambdaOption("imageLambda", props.timeout) ?? Duration.seconds(10)
+          toLambdaOption("imageLambda", props.timeout) ?? Duration.seconds(10),
       });
-      this.nextImageLambda.currentVersion.addAlias("live");
+      new lambda.Alias(this, "NextImageLambdaAlias", {
+        version: this.nextImageLambda.currentVersion,
+        aliasName: "live",
+      });
     }
 
     this.nextStaticsCachePolicy =
@@ -252,7 +266,7 @@ export class NextJSLambdaEdge extends Construct {
         maxTtl: Duration.days(30),
         minTtl: Duration.days(30),
         enableAcceptEncodingBrotli: true,
-        enableAcceptEncodingGzip: true
+        enableAcceptEncodingGzip: true,
       });
 
     this.nextImageCachePolicy =
@@ -266,7 +280,7 @@ export class NextJSLambdaEdge extends Construct {
         maxTtl: Duration.days(365),
         minTtl: Duration.days(0),
         enableAcceptEncodingBrotli: true,
-        enableAcceptEncodingGzip: true
+        enableAcceptEncodingGzip: true,
       });
 
     this.nextLambdaCachePolicy =
@@ -276,30 +290,30 @@ export class NextJSLambdaEdge extends Construct {
         queryStringBehavior: cloudfront.CacheQueryStringBehavior.all(),
         headerBehavior: props.whiteListedHeaders
           ? cloudfront.CacheHeaderBehavior.allowList(
-              ...props.whiteListedHeaders
+              ...props.whiteListedHeaders,
             )
           : cloudfront.CacheHeaderBehavior.none(),
         cookieBehavior: {
           behavior: props.whiteListedCookies?.length ? "whitelist" : "all",
-          cookies: props.whiteListedCookies
+          cookies: props.whiteListedCookies,
         },
         defaultTtl: Duration.seconds(0),
         maxTtl: Duration.days(365),
         minTtl: Duration.seconds(0),
         enableAcceptEncodingBrotli: true,
-        enableAcceptEncodingGzip: true
+        enableAcceptEncodingGzip: true,
       });
 
     const edgeLambdas: cloudfront.EdgeLambda[] = [
       {
         includeBody: true,
         eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-        functionVersion: this.defaultNextLambda.currentVersion
+        functionVersion: this.defaultNextLambda.currentVersion,
       },
       {
         eventType: cloudfront.LambdaEdgeEventType.ORIGIN_RESPONSE,
-        functionVersion: this.defaultNextLambda.currentVersion
-      }
+        functionVersion: this.defaultNextLambda.currentVersion,
+      },
     ];
 
     const {
@@ -324,7 +338,7 @@ export class NextJSLambdaEdge extends Construct {
           compress: true,
           cachePolicy: this.nextLambdaCachePolicy,
           edgeLambdas: [...edgeLambdas, ...additionalDefaultEdgeLambdas],
-          ...(defaultBehavior || {})
+          ...(defaultBehavior || {}),
         },
         additionalBehaviors: {
           ...(this.nextImageLambda
@@ -343,16 +357,16 @@ export class NextJSLambdaEdge extends Construct {
                     "ImageOriginRequest",
                     {
                       queryStringBehavior:
-                        OriginRequestQueryStringBehavior.all()
-                    }
+                        OriginRequestQueryStringBehavior.all(),
+                    },
                   ),
                   edgeLambdas: [
                     {
                       eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                      functionVersion: this.nextImageLambda.currentVersion
-                    }
-                  ]
-                }
+                      functionVersion: this.nextImageLambda.currentVersion,
+                    },
+                  ],
+                },
               }
             : {}),
           [this.pathPattern("_next/data/*")]: {
@@ -363,7 +377,7 @@ export class NextJSLambdaEdge extends Construct {
             cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
             compress: true,
             cachePolicy: this.nextLambdaCachePolicy,
-            edgeLambdas
+            edgeLambdas,
           },
           [this.pathPattern("_next/*")]: {
             viewerProtocolPolicy:
@@ -372,7 +386,7 @@ export class NextJSLambdaEdge extends Construct {
             allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
             cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
             compress: true,
-            cachePolicy: this.nextStaticsCachePolicy
+            cachePolicy: this.nextStaticsCachePolicy,
           },
           [this.pathPattern("static/*")]: {
             viewerProtocolPolicy:
@@ -381,7 +395,7 @@ export class NextJSLambdaEdge extends Construct {
             allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
             cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
             compress: true,
-            cachePolicy: this.nextStaticsCachePolicy
+            cachePolicy: this.nextStaticsCachePolicy,
           },
           ...(this.nextApiLambda
             ? {
@@ -398,17 +412,17 @@ export class NextJSLambdaEdge extends Construct {
                     {
                       includeBody: true,
                       eventType: cloudfront.LambdaEdgeEventType.ORIGIN_REQUEST,
-                      functionVersion: this.nextApiLambda.currentVersion
-                    }
-                  ]
-                }
+                      functionVersion: this.nextApiLambda.currentVersion,
+                    },
+                  ],
+                },
               }
             : {}),
-          ...(props.behaviours || {})
+          ...(props.behaviours || {}),
         },
         // Override props.
-        ...(props.cloudfrontProps || {})
-      }
+        ...(props.cloudfrontProps || {}),
+      },
     );
 
     const assetsDirectory = path.join(props.serverlessBuildOutDir, "assets");
@@ -416,7 +430,7 @@ export class NextJSLambdaEdge extends Construct {
     const normalizedBasePath =
       basePath && basePath.length > 0 ? basePath.slice(1) : "";
     const assets = readAssetsDirectory({
-      assetsDirectory: path.join(assetsDirectory, normalizedBasePath)
+      assetsDirectory: path.join(assetsDirectory, normalizedBasePath),
     });
 
     // This `BucketDeployment` deploys just the BUILD_ID file. We don't actually
@@ -426,7 +440,9 @@ export class NextJSLambdaEdge extends Construct {
     new s3Deploy.BucketDeployment(this, `AssetDeploymentBuildID`, {
       destinationBucket: this.bucket,
       sources: [
-        s3Deploy.Source.asset(assetsDirectory, { exclude: ["**", "!BUILD_ID"] })
+        s3Deploy.Source.asset(assetsDirectory, {
+          exclude: ["**", "!BUILD_ID"],
+        }),
       ],
       // This will actually cause the file to exist at BUILD_ID, we do this so
       // that the prune will only prune /BUILD_ID/*, rather than all files fromm
@@ -436,8 +452,8 @@ export class NextJSLambdaEdge extends Construct {
       distributionPaths:
         props.invalidationPaths ||
         reduceInvalidationPaths(
-          readInvalidationPathsFromManifest(this.defaultManifest)
-        )
+          readInvalidationPathsFromManifest(this.defaultManifest),
+        ),
     });
 
     Object.keys(assets).forEach((key) => {
@@ -451,13 +467,13 @@ export class NextJSLambdaEdge extends Construct {
         // at the root '/', we don't want this, we want to maintain the same
         // path on S3 as their local path. Note that this should be a posix path.
         destinationKeyPrefix: pathToPosix(
-          path.relative(assetsDirectory, assetPath)
+          path.relative(assetsDirectory, assetPath),
         ),
 
         // Source directories are uploaded with `--sync` this means that any
         // files that don't exist in the source directory, but do in the S3
         // bucket, will be removed.
-        prune: true
+        prune: true,
       });
     });
 
@@ -468,8 +484,8 @@ export class NextJSLambdaEdge extends Construct {
           recordName: domainName,
           zone: hostedZone,
           target: RecordTarget.fromAlias(
-            new CloudFrontTarget(this.distribution)
-          )
+            new CloudFrontTarget(this.distribution),
+          ),
         });
       });
     }
@@ -486,8 +502,8 @@ export class NextJSLambdaEdge extends Construct {
     return fs.readJSONSync(
       path.join(
         this.props.serverlessBuildOutDir,
-        "default-lambda/routes-manifest.json"
-      )
+        "default-lambda/routes-manifest.json",
+      ),
     );
   }
 
@@ -495,8 +511,8 @@ export class NextJSLambdaEdge extends Construct {
     return fs.readJSONSync(
       path.join(
         this.props.serverlessBuildOutDir,
-        "default-lambda/manifest.json"
-      )
+        "default-lambda/manifest.json",
+      ),
     );
   }
 
@@ -504,15 +520,15 @@ export class NextJSLambdaEdge extends Construct {
     return fs.readJSONSync(
       path.join(
         this.props.serverlessBuildOutDir,
-        "default-lambda/prerender-manifest.json"
-      )
+        "default-lambda/prerender-manifest.json",
+      ),
     );
   }
 
   private readApiBuildManifest(): OriginRequestApiHandlerManifest | null {
     const apiPath = path.join(
       this.props.serverlessBuildOutDir,
-      "api-lambda/manifest.json"
+      "api-lambda/manifest.json",
     );
     if (!fs.existsSync(apiPath)) return null;
     return fs.readJsonSync(apiPath);
@@ -521,7 +537,7 @@ export class NextJSLambdaEdge extends Construct {
   private readImageBuildManifest(): OriginRequestImageHandlerManifest | null {
     const imageLambdaPath = path.join(
       this.props.serverlessBuildOutDir,
-      "image-lambda/manifest.json"
+      "image-lambda/manifest.json",
     );
 
     return fs.existsSync(imageLambdaPath)

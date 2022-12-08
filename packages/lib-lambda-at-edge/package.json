@@ -89,7 +89,9 @@
     "fs-extra": "9.1.0",
     "get-stream": "6.0.1",
     "node-fetch": "2.6.5",
-    "normalize-path": "3.0.0"
+    "normalize-path": "3.0.0",
+    "pino": "^8.7.0",
+    "pino-pretty": "^9.1.1"
   },
   "peerDependencies": {
     "builtin-modules": "3.2.0"
