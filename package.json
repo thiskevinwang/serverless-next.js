@@ -78,8 +78,6 @@
     ]
   },
   "workspaces": [
-    "packages/compat-layers/*",
-    "packages/serverless-components/*",
-    "packages/libs/*"
+    "packages/*"
   ]
 }

@@ -35,7 +35,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "3.54.0",
     "@aws-sdk/client-sqs": "3.54.0",
-    "@sls-next/core": "link:../core"
+    "@sls-next/core": "*"
   },
   "devDependencies": {
     "@types/node": "17.0.19",
