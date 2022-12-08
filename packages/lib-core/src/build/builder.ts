@@ -14,7 +14,7 @@ import { NextConfig } from "./types";
 import normalizePath from "normalize-path";
 import createServerlessConfig from "./lib/createServerlessConfig";
 import execa from "execa";
-import { prepareBuildManifests } from "./";
+import { prepareBuildManifests } from ".";
 import pathToPosix from "./lib/pathToPosix";
 
 export const ASSETS_DIR = "assets";
