@@ -30,6 +30,7 @@ import * as sqs from "aws-cdk-lib/aws-sqs";
 import { Construct } from "constructs";
 import * as fs from "fs-extra";
 
+import { logger } from "./logger";
 import { Props } from "./props";
 import pathToPosix from "./utils/pathToPosix";
 import { readAssetsDirectory } from "./utils/readAssetsDirectory";
@@ -41,39 +42,22 @@ export * from "./props";
 
 export class NextJSLambdaEdge extends Construct {
   private routesManifest: RoutesManifest | null;
-
   private apiBuildManifest: OriginRequestApiHandlerManifest | null;
-
   private imageManifest: OriginRequestImageHandlerManifest | null;
-
   private defaultManifest: OriginRequestDefaultHandlerManifest;
-
   private prerenderManifest: PreRenderedManifest;
-
   public distribution: cloudfront.Distribution;
-
   public bucket: s3.Bucket;
-
   public edgeLambdaRole: Role;
-
   public defaultNextLambda: lambda.Function;
-
   public nextApiLambda: lambda.Function | null;
-
   public nextImageLambda: lambda.Function | null;
-
   public nextStaticsCachePolicy: cloudfront.CachePolicy;
-
   public nextImageCachePolicy: cloudfront.CachePolicy;
-
   public nextLambdaCachePolicy: cloudfront.CachePolicy;
-
   public aRecord?: ARecord;
-
   public regenerationQueue?: sqs.Queue;
-
   public regenerationFunction?: lambda.Function;
-
   constructor(scope: Construct, id: string, private props: Props) {
     super(scope, id);
     this.apiBuildManifest = this.readApiBuildManifest();
@@ -112,12 +96,14 @@ export class NextJSLambdaEdge extends Construct {
         typeof this.prerenderManifest.routes[key].initialRevalidateSeconds ===
         "number",
     );
+    logger.info(`hasISRPages: ${hasISRPages}`);
 
     const hasDynamicISRPages = Object.keys(
       this.prerenderManifest.dynamicRoutes,
     ).some(
       (key) => this.prerenderManifest.dynamicRoutes[key].fallback !== false,
     );
+    logger.info(`hasDynamicISRPages: ${hasDynamicISRPages}`);
 
     if (hasISRPages || hasDynamicISRPages) {
       this.regenerationQueue = new sqs.Queue(this, "RegenerationQueue", {
