@@ -130,13 +130,14 @@ export class NextJSLambdaEdge extends Construct {
         this,
         "RegenerationFunction",
         {
+          architecture: lambda.Architecture.ARM_64,
           handler: "index.handler",
           code: lambda.Code.fromAsset(
             path.join(this.props.serverlessBuildOutDir, "regeneration-lambda")
           ),
           runtime:
             toLambdaOption("regenerationLambda", props.runtime) ??
-            lambda.Runtime.NODEJS_14_X,
+            lambda.Runtime.NODEJS_18_X,
           memorySize:
             toLambdaOption("regenerationLambda", props.memory) ?? undefined,
           timeout:
@@ -151,6 +152,7 @@ export class NextJSLambdaEdge extends Construct {
     }
 
     this.defaultNextLambda = new lambda.Function(this, "NextLambda", {
+      architecture: lambda.Architecture.ARM_64,
       functionName: toLambdaOption("defaultLambda", props.name),
       description: `Default Lambda@Edge for Next CloudFront distribution`,
       handler: props.handler || "index.handler",
@@ -164,7 +166,7 @@ export class NextJSLambdaEdge extends Construct {
       role: this.edgeLambdaRole,
       runtime:
         toLambdaOption("defaultLambda", props.runtime) ??
-        lambda.Runtime.NODEJS_12_X,
+        lambda.Runtime.NODEJS_18_X,
       memorySize: toLambdaOption("defaultLambda", props.memory) ?? 512,
       timeout:
         toLambdaOption("defaultLambda", props.timeout) ?? Duration.seconds(10)
@@ -188,6 +190,7 @@ export class NextJSLambdaEdge extends Construct {
     this.nextApiLambda = null;
     if (hasAPIPages) {
       this.nextApiLambda = new lambda.Function(this, "NextApiLambda", {
+        architecture: lambda.Architecture.ARM_64,
         functionName: toLambdaOption("apiLambda", props.name),
         description: `Default Lambda@Edge for Next API CloudFront distribution`,
         handler: "index.handler",
@@ -202,7 +205,7 @@ export class NextJSLambdaEdge extends Construct {
         role: this.edgeLambdaRole,
         runtime:
           toLambdaOption("apiLambda", props.runtime) ??
-          lambda.Runtime.NODEJS_12_X,
+          lambda.Runtime.NODEJS_18_X,
         memorySize: toLambdaOption("apiLambda", props.memory) ?? 512,
         timeout:
           toLambdaOption("apiLambda", props.timeout) ?? Duration.seconds(10)
@@ -213,6 +216,7 @@ export class NextJSLambdaEdge extends Construct {
     this.nextImageLambda = null;
     if (this.imageManifest) {
       this.nextImageLambda = new lambda.Function(this, "NextImageLambda", {
+        architecture: lambda.Architecture.ARM_64,
         functionName: toLambdaOption("imageLambda", props.name),
         description: `Default Lambda@Edge for Next Image CloudFront distribution`,
         handler: "index.handler",
@@ -227,7 +231,7 @@ export class NextJSLambdaEdge extends Construct {
         role: this.edgeLambdaRole,
         runtime:
           toLambdaOption("imageLambda", props.runtime) ??
-          lambda.Runtime.NODEJS_12_X,
+          lambda.Runtime.NODEJS_18_X,
         memorySize: toLambdaOption("imageLambda", props.memory) ?? 512,
         timeout:
           toLambdaOption("imageLambda", props.timeout) ?? Duration.seconds(10)
