@@ -6,7 +6,7 @@ import {
   updateCloudFrontDistribution,
   deleteCloudFrontDistribution,
   setCloudFrontDistributionTags
-} from "./";
+} from ".";
 
 /*
  * Website

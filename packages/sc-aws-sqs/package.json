@@ -29,5 +29,8 @@
   "peerDependencies": {
     "@serverless/core": "1.1.2",
     "aws-sdk": "2.1093.0"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.4"
   }
 }

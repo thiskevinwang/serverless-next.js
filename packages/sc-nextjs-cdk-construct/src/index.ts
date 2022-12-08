@@ -137,9 +137,11 @@ export class NextJSLambdaEdge extends Construct {
           runtime:
             toLambdaOption("regenerationLambda", props.runtime) ??
             lambda.Runtime.NODEJS_14_X,
-          memorySize: toLambdaOption("regenerationLambda", props.memory) ?? undefined,
+          memorySize:
+            toLambdaOption("regenerationLambda", props.memory) ?? undefined,
           timeout:
-            toLambdaOption("regenerationLambda", props.timeout) ?? Duration.seconds(30)
+            toLambdaOption("regenerationLambda", props.timeout) ??
+            Duration.seconds(30)
         }
       );
 
@@ -245,8 +247,7 @@ export class NextJSLambdaEdge extends Construct {
         minTtl: Duration.days(30),
         enableAcceptEncodingBrotli: true,
         enableAcceptEncodingGzip: true
-      }
-    );
+      });
 
     this.nextImageCachePolicy =
       props.nextImageCachePolicy ||
@@ -260,8 +261,7 @@ export class NextJSLambdaEdge extends Construct {
         minTtl: Duration.days(0),
         enableAcceptEncodingBrotli: true,
         enableAcceptEncodingGzip: true
-      }
-    );
+      });
 
     this.nextLambdaCachePolicy =
       props.nextLambdaCachePolicy ||
@@ -282,8 +282,7 @@ export class NextJSLambdaEdge extends Construct {
         minTtl: Duration.seconds(0),
         enableAcceptEncodingBrotli: true,
         enableAcceptEncodingGzip: true
-      }
-    );
+      });
 
     const edgeLambdas: cloudfront.EdgeLambda[] = [
       {
@@ -408,8 +407,11 @@ export class NextJSLambdaEdge extends Construct {
 
     const assetsDirectory = path.join(props.serverlessBuildOutDir, "assets");
     const { basePath } = this.routesManifest || {};
-    const normalizedBasePath = basePath && basePath.length > 0 ? basePath.slice(1) : "";
-    const assets = readAssetsDirectory({ assetsDirectory: path.join(assetsDirectory, normalizedBasePath) });
+    const normalizedBasePath =
+      basePath && basePath.length > 0 ? basePath.slice(1) : "";
+    const assets = readAssetsDirectory({
+      assetsDirectory: path.join(assetsDirectory, normalizedBasePath)
+    });
 
     // This `BucketDeployment` deploys just the BUILD_ID file. We don't actually
     // use the BUILD_ID file at runtime, however in this case we use it as a
