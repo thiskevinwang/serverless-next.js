@@ -4,7 +4,7 @@
  * This script allows you to run the builder from the command line. It's useful for deployments like Terraform for CDK since it can't execute Node.js code directly.
  */
 
-import { LambdaBuilder } from "src/build";
+import { LambdaBuilder } from "../../build";
 import yargs from "yargs";
 import { CoreBuildOptions } from "@sls-next/core";
 import { LambdaBuildOptions } from "src/types";

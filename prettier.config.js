@@ -6,15 +6,15 @@ module.exports = {
   semi: true,
   importOrder: [
     // node stdlib
-    "^(path|fs|child_process)$",
+    "^(path|fs|child_process|os)$",
     // sls
     "^@sls-next",
     // next/react/swr'
     "^(next|swr|react)(.*)$",
     // node_modules
     "<THIRD_PARTY_MODULES>",
-    "^[./]"
+    "^[./]",
   ],
   importOrderSeparation: true,
-  importOrderSortSpecifiers: true
+  importOrderSortSpecifiers: true,
 };

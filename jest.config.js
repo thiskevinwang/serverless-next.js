@@ -3,11 +3,11 @@ module.exports = {
   collectCoverage: true,
   collectCoverageFrom: ["<rootDir>/packages/**/*.{js,ts}"],
   moduleNameMapper: {
-    "fs-extra": "<rootDir>/node_modules/fs-extra",
-    "@sls-next/core/package.json": "<rootDir>/packages/libs/core/package.json",
-    "@sls-next/core/dist/module(.*)": "<rootDir>/packages/libs/core/src$1",
-    "@sls-next/core/dist(.*)": "<rootDir>/packages/libs/core/src$1",
-    "@sls-next/core(.*)": "<rootDir>/packages/libs/core/src$1"
+    // "fs-extra": "<rootDir>/node_modules/fs-extra",
+    // "@sls-next/core/package.json": "<rootDir>/packages/libs/core/package.json",
+    // "@sls-next/core/dist/module(.*)": "<rootDir>/packages/libs/core/src$1",
+    // "@sls-next/core/dist(.*)": "<rootDir>/packages/libs/core/src$1",
+    // "@sls-next/core(.*)": "<rootDir>/packages/libs/core/src$1"
   },
   coverageDirectory: "<rootDir>/coverage/",
   coveragePathIgnorePatterns: [
@@ -33,7 +33,7 @@ module.exports = {
     "<rootDir>/packages/libs/core/src/platform/platformClient.ts",
     "<rootDir>/packages/libs/core/src/build/builder.ts",
     "<rootDir>/packages/libs/aws-common/src/awsPlatformClient.ts",
-    "<rootDir>/packages/libs/lambda/"
+    "<rootDir>/packages/libs/lambda/",
   ],
   watchPathIgnorePatterns: ["/fixture/", "/fixtures/"],
   testPathIgnorePatterns: [
@@ -46,11 +46,11 @@ module.exports = {
     "/integration/",
     "/cypress/",
     "/sharp_node_modules/",
-    "aws-sdk.mock.ts"
+    "aws-sdk.mock.ts",
   ],
   setupFiles: ["<rootDir>/jest.setup.js"],
   modulePathIgnorePatterns: ["/sharp_node_modules/"],
   testSequencer: "<rootDir>/jest-sequencer.js",
   modulePaths: ["<rootDir>/packages/libs/lambda"], // this allows us to use absolute imports from these packages
-  reporters: ["default", "jest-junit"]
+  reporters: ["default", "jest-junit"],
 };

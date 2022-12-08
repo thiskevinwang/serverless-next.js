@@ -1,9 +1,12 @@
-import { LambdaBuilder } from "src/build";
-import { CoreBuildOptions } from "@sls-next/core";
-import { v4 as uuidv4 } from "uuid";
-import { join } from "path";
-import { LambdaBuildOptions } from "src/types";
 import os from "os";
+import { join } from "path";
+
+import { CoreBuildOptions } from "@sls-next/core";
+
+import { LambdaBuildOptions } from "src/types";
+import { v4 as uuidv4 } from "uuid";
+
+import { LambdaBuilder } from "../../src/build";
 
 describe("Builder Tests", () => {
   let builder: LambdaBuilder;
@@ -11,7 +14,7 @@ describe("Builder Tests", () => {
 
   const lambdaBuildOptions: LambdaBuildOptions = {
     bucketName: "test-bucket",
-    bucketRegion: "us-east-1"
+    bucketRegion: "us-east-1",
   };
 
   beforeEach(() => {
@@ -23,7 +26,7 @@ describe("Builder Tests", () => {
       nextConfigDir: join(__dirname, "fixtures/simple-app"),
       outputDir: outputDir,
       cmd: "true", // to skip next build,
-      cleanupDotNext: false
+      cleanupDotNext: false,
     };
 
     builder = new LambdaBuilder(lambdaBuildOptions, coreBuildOptions);
