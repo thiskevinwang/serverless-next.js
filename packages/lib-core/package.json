@@ -17,9 +17,9 @@
     "directory": "packages/libs/core"
   },
   "scripts": {
-    "prepack": "yarn clean && yarn build",
-    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.module.json && yarn copy-sharp-modules",
-    "clean": "yarn rimraf dist",
+    "prepack": "npm run clean && npm run build",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.module.json && npm run copy-sharp-modules",
+    "clean": "rimraf dist",
     "copy-sharp-modules": "ts-node --project tsconfig.scripts.json scripts/copy-sharp-modules.ts",
     "test": "jest"
   },

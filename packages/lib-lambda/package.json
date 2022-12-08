@@ -16,11 +16,11 @@
     "directory": "packages/libs/lambda"
   },
   "scripts": {
-    "prepack": "yarn clean && yarn build",
+    "prepack": "npm run clean && npm run build",
     "build": "tsc -p tsconfig.build.json && yarn rollup",
     "esbuild": "node esbuild.js",
     "rollup": "rollup --config",
-    "clean": "yarn rimraf dist",
+    "clean": "rimraf dist",
     "test": "jest"
   },
   "keywords": [

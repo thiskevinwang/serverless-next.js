@@ -16,9 +16,9 @@
     "directory": "packages/libs/aws-common"
   },
   "scripts": {
-    "prepack": "yarn clean && yarn build",
+    "prepack": "npm run clean && npm run build",
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.module.json",
-    "clean": "yarn rimraf dist"
+    "clean": "rimraf dist"
   },
   "keywords": [
     "AWS",

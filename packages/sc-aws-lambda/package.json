@@ -19,9 +19,9 @@
   "homepage": "https://github.com/serverless-nextjs/serverless-next.js#readme",
   "scripts": {
     "test": "jest",
-    "clean": "yarn rimraf dist",
+    "clean": "rimraf dist",
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "yarn clean && yarn build"
+    "prepack": "npm run clean && npm run build"
   },
   "devDependencies": {
     "@jest/globals": "27.4.6",

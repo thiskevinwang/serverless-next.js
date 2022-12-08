@@ -26,7 +26,7 @@
     "integration": "jest --runInBand --config jest.integration.config.json --setupTestFrameworkScriptFile=./jest.integration.setup.js",
     "integration:ci": "jest --runInBand --config jest.integration.config.json --setupTestFrameworkScriptFile=./jest.integration.setup.js --ci --reporters=default --reporters=jest-junit",
     "build": "lerna run build",
-    "clean": "lerna run clean",
+    "clean": "turbo run clean",
     "docs": "cd documentation && yarn && yarn build",
     "handlers:upload-handler-sizes": "ts-node scripts/upload-handler-sizes.ts",
     "handlers:comment-handler-sizes": "ts-node scripts/comment-handler-sizes.ts"

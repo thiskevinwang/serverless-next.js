@@ -16,9 +16,9 @@
     "directory": "packages/libs/s3-static-assets"
   },
   "scripts": {
-    "prepack": "yarn clean && yarn build",
+    "prepack": "npm run clean && npm run build",
     "build": "tsc -p tsconfig.build.json",
-    "clean": "yarn rimraf dist",
+    "clean": "rimraf dist",
     "test": "jest"
   },
   "keywords": [

@@ -7,9 +7,9 @@
   },
   "scripts": {
     "lint": "eslint . --fix --cache",
-    "clean": "yarn rimraf dist",
+    "clean": "rimraf dist",
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "yarn clean && yarn build"
+    "prepack": "npm run clean && npm run build"
   },
   "author": "Serverless, Inc and Daniel Phang",
   "license": "Apache-2.0",
